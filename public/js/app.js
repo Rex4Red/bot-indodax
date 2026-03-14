@@ -147,7 +147,7 @@ function renderBotList() {
         const hasPos = bot.position_amount > 0;
 
         return `
-            <div class="bot-item" style="flex-wrap:wrap;cursor:pointer" onclick="openChartModal('${bot.pair}', '${coin.toUpperCase()}')">
+            <div class="bot-item" style="flex-wrap:wrap;cursor:pointer" onclick="openChartModal('${bot.pair}', '${coin.toUpperCase()}')" ontouchend="if(!event.target.closest('.bot-item-actions')){event.preventDefault();openChartModal('${bot.pair}', '${coin.toUpperCase()}');}">
                 <div class="bot-item-left">
                     <div class="bot-item-logo" style="background:${bg}">${coin.substring(0, 2).toUpperCase()}</div>
                     <div class="bot-item-info">
@@ -421,7 +421,7 @@ function renderPairs() {
         const isPositive = changePct >= 0;
 
         return `
-            <div class="pair-card" onclick="openChartModal('${p.ticker_id}', '${(p.name || coin.toUpperCase()).replace(/'/g, "\\'")}')">
+            <div class="pair-card" onclick="openChartModal('${p.ticker_id}', '${(p.name || coin.toUpperCase()).replace(/'/g, "\\'")}')" ontouchend="if(!event.target.closest('.btn-select')&&!event.target.closest('.favorite-btn')){event.preventDefault();openChartModal('${p.ticker_id}', '${(p.name || coin.toUpperCase()).replace(/'/g, "\\'")}');}">
                 <div class="pair-card-top">
                     <div class="pair-info">
                         ${p.url_logo_png
@@ -639,7 +639,7 @@ async function loadChartData() {
         const data = await api(`/chart/${chartCurrentPair}?interval=${chartCurrentInterval}`);
 
         // Update candles
-        if (data.candles && data.candles.length > 0) {
+        if (data.candles && data.candles.length > 0 && chartCandleSeries && chartInstance) {
             chartCandleSeries.setData(data.candles);
             chartInstance.timeScale().fitContent();
         }
