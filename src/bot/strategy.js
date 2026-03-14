@@ -39,7 +39,9 @@ function calculateProfitLoss(sellPrice, buyPrice, amount) {
 
 function calculateCoinAmount(idrAmount, price) {
     if (!price || price === 0) return 0;
-    return idrAmount / price;
+    // Indodax requires max 8 decimal places
+    const raw = idrAmount / price;
+    return Math.floor(raw * 1e8) / 1e8;
 }
 
 function formatIDR(value) {
