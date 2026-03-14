@@ -145,11 +145,14 @@ class BotEngine extends EventEmitter {
             this.log('buy', `🔵 [${pairLabel}] [SIMULASI] Order BUY dicatat`, bot.pair);
         }
 
-        db.updateBot(bot.id, {
-            buy_price: currentPrice,
-            position_amount: coinAmount,
-            position_coin: coin
-        });
+        // Only update bot position if trade succeeded or in simulation
+        if (status !== 'failed') {
+            db.updateBot(bot.id, {
+                buy_price: currentPrice,
+                position_amount: coinAmount,
+                position_coin: coin
+            });
+        }
 
         db.addTradeLog({
             pair: bot.pair,
@@ -161,8 +164,12 @@ class BotEngine extends EventEmitter {
             order_id: orderId,
             is_simulation: globalSettings.simulation_mode,
             bot_id: bot.id,
-            notes: `Buy dip at ${strategy.calculateChangePercent(currentPrice, bot.reference_price).toFixed(2)}%`
+            notes: status === 'failed' ? `FAILED: Buy attempt at ${strategy.formatIDR(currentPrice)}` : `Buy dip at ${strategy.calculateChangePercent(currentPrice, bot.reference_price).toFixed(2)}%`
         });
+
+        if (status === 'failed') {
+            throw new Error('Trade gagal dieksekusi di Indodax');
+        }
 
         this.emit('trade', { type: 'buy', pair: bot.pair, price: currentPrice, amount: coinAmount });
     }
@@ -171,7 +178,7 @@ class BotEngine extends EventEmitter {
         const coin = bot.pair.split('_')[0];
         const pl = strategy.calculateProfitLoss(currentPrice, bot.buy_price, bot.position_amount);
         const pairLabel = bot.pair.replace('_', '/').toUpperCase();
-        const reasonLabel = reason === 'take_profit' ? 'TAKE PROFIT 📈' : 'STOP LOSS 📉';
+        const reasonLabel = reason === 'take_profit' ? 'TAKE PROFIT 📈' : reason === 'stop_loss' ? 'STOP LOSS 📉' : 'MANUAL SELL 🖐️';
 
         this.log('sell', `🔴 [${pairLabel}] ${reasonLabel}`, bot.pair);
         this.log('sell', `💵 [${pairLabel}] Menjual ${bot.position_amount.toFixed(8)} ${coin.toUpperCase()} @ ${strategy.formatIDR(currentPrice)}`, bot.pair);
@@ -193,12 +200,15 @@ class BotEngine extends EventEmitter {
             this.log('sell', `🔵 [${pairLabel}] [SIMULASI] Order SELL dicatat`, bot.pair);
         }
 
-        db.updateBot(bot.id, {
-            buy_price: 0,
-            position_amount: 0,
-            position_coin: '',
-            reference_price: currentPrice
-        });
+        // Only update bot position if trade succeeded or in simulation
+        if (status !== 'failed') {
+            db.updateBot(bot.id, {
+                buy_price: 0,
+                position_amount: 0,
+                position_coin: '',
+                reference_price: currentPrice
+            });
+        }
 
         db.addTradeLog({
             pair: bot.pair,
@@ -206,14 +216,18 @@ class BotEngine extends EventEmitter {
             price: currentPrice,
             amount: bot.position_amount,
             total: currentPrice * bot.position_amount,
-            profit_loss: pl.absolute,
-            profit_loss_pct: pl.percentage,
+            profit_loss: status !== 'failed' ? pl.absolute : 0,
+            profit_loss_pct: status !== 'failed' ? pl.percentage : 0,
             status,
             order_id: orderId,
             is_simulation: globalSettings.simulation_mode,
             bot_id: bot.id,
-            notes: `${reason}: ${pl.percentage.toFixed(2)}%`
+            notes: status === 'failed' ? `FAILED: Sell attempt at ${strategy.formatIDR(currentPrice)}` : `${reason}: ${pl.percentage.toFixed(2)}%`
         });
+
+        if (status === 'failed') {
+            throw new Error('Trade gagal dieksekusi di Indodax');
+        }
 
         this.emit('trade', { type: 'sell', pair: bot.pair, price: currentPrice, amount: bot.position_amount, pnl: pl });
     }
