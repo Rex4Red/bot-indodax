@@ -5,10 +5,9 @@ const DB_PATH = path.join(__dirname, '..', '..', 'data.json');
 
 const DEFAULT_DATA = {
     global_settings: {
-        check_interval: 10,
-        simulation_mode: 1
+        check_interval: 10
     },
-    bots: [],  // Array of bot configs: { id, pair, buy_threshold, sell_profit, sell_loss, trade_amount, is_active, reference_price, buy_price, position_amount, position_coin }
+    bots: [],  // Array of bot configs with per-coin simulation_mode and price tracking
     trades: [],
     favorites: []
 };
@@ -48,6 +47,20 @@ function load() {
             if (!data.trades) data.trades = [];
             if (!data.favorites) data.favorites = [];
             if (!data.global_settings) data.global_settings = { ...DEFAULT_DATA.global_settings };
+            // Migrate: move global simulation_mode to per-bot
+            if (data.global_settings.simulation_mode !== undefined) {
+                const simMode = data.global_settings.simulation_mode;
+                for (const bot of data.bots) {
+                    if (bot.simulation_mode === undefined) bot.simulation_mode = simMode;
+                }
+                delete data.global_settings.simulation_mode;
+            }
+            // Migrate: add price tracking fields to existing bots
+            for (const bot of data.bots) {
+                if (bot.simulation_mode === undefined) bot.simulation_mode = 1;
+                if (bot.price_high === undefined) bot.price_high = 0;
+                if (bot.price_low === undefined) bot.price_low = 0;
+            }
         } else {
             data = JSON.parse(JSON.stringify(DEFAULT_DATA));
         }
@@ -110,10 +123,13 @@ function addBot(config) {
         sell_loss: config.sell_loss || 2,
         trade_amount: config.trade_amount || 100000,
         is_active: config.is_active !== undefined ? config.is_active : true,
+        simulation_mode: config.simulation_mode !== undefined ? config.simulation_mode : 1,
         reference_price: 0,
         buy_price: 0,
         position_amount: 0,
-        position_coin: config.pair.split('_')[0]
+        position_coin: config.pair.split('_')[0],
+        price_high: 0,
+        price_low: 0
     };
     data.bots.push(bot);
     save();
@@ -125,7 +141,8 @@ function updateBot(id, updates) {
     if (idx === -1) throw new Error('Bot tidak ditemukan');
 
     const allowed = ['buy_threshold', 'sell_profit', 'sell_loss', 'trade_amount', 'is_active',
-                     'reference_price', 'buy_price', 'position_amount', 'position_coin'];
+                     'simulation_mode', 'reference_price', 'buy_price', 'position_amount', 'position_coin',
+                     'price_high', 'price_low'];
     for (const key of allowed) {
         if (updates[key] !== undefined && updates[key] !== null) {
             data.bots[idx][key] = updates[key];

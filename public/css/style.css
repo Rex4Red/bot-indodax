@@ -1246,3 +1246,89 @@ tbody tr:hover {
         padding: 8px;
     }
 }
+
+/* === Log Tabs === */
+.log-tabs {
+    display: flex;
+    gap: 6px;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--border-color);
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+.log-tabs::-webkit-scrollbar { display: none; }
+.log-tab {
+    padding: 5px 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+}
+.log-tab:hover { border-color: var(--accent-cyan); color: var(--text-primary); }
+.log-tab.active {
+    background: var(--accent-cyan-dim);
+    border-color: var(--accent-cyan);
+    color: var(--accent-cyan);
+    font-weight: 600;
+}
+
+/* === Sim/Live Badges === */
+.sim-badge, .live-badge {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-left: 6px;
+    font-weight: 600;
+    vertical-align: middle;
+}
+.sim-badge {
+    background: rgba(66, 133, 244, 0.15);
+    color: #4285f4;
+}
+.live-badge {
+    background: var(--accent-green-dim);
+    color: var(--accent-green);
+}
+
+/* === Price Analysis === */
+.price-analysis {
+    display: flex;
+    gap: 12px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+}
+.analysis-item {
+    font-size: 11px;
+    font-weight: 500;
+}
+.analysis-item.high { color: var(--accent-green); }
+.analysis-item.low { color: var(--accent-red); }
+.analysis-item small { opacity: 0.8; }
+
+/* === Coin Converter === */
+.coin-converter {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 6px;
+    padding: 8px 12px;
+    background: var(--accent-cyan-dim);
+    border: 1px solid rgba(0, 212, 255, 0.2);
+    border-radius: 8px;
+    font-size: 13px;
+    color: var(--accent-cyan);
+}
+.coin-converter strong {
+    font-size: 14px;
+}
+
+/* === Toggle Small (per-coin simulation) === */
+.toggle-sm {
+    transform: scale(0.75);
+    margin: -4px 0;
+}

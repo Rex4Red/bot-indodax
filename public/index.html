@@ -74,7 +74,7 @@
             <div>
                 <div class="card" style="margin-bottom:16px">
                     <div class="card-header">
-                        <div class="card-title">⚙️ Kontrol Global</div>
+                        <div class="card-title">⚙️ Kontrol Bot</div>
                     </div>
                     <div class="bot-control-item">
                         <div class="bot-control-info">
@@ -86,19 +86,6 @@
                         </div>
                         <label class="toggle">
                             <input type="checkbox" id="toggleBot" onchange="toggleBot()">
-                            <span class="toggle-slider"></span>
-                        </label>
-                    </div>
-                    <div class="bot-control-item">
-                        <div class="bot-control-info">
-                            <div class="bot-control-icon sim">🔬</div>
-                            <div>
-                                <div class="bot-control-label">Mode Simulasi</div>
-                                <div class="bot-control-desc">Trading tanpa dana riil</div>
-                            </div>
-                        </div>
-                        <label class="toggle">
-                            <input type="checkbox" id="toggleSimulation" checked onchange="toggleSimulation()">
                             <span class="toggle-slider"></span>
                         </label>
                     </div>
@@ -121,6 +108,9 @@
                     <div class="card-header">
                         <div class="card-title">📋 Log Aktivitas</div>
                         <button class="btn btn-outline" style="font-size:12px;padding:4px 12px" onclick="refreshLogs()">Refresh</button>
+                    </div>
+                    <div class="log-tabs" id="logTabs">
+                        <button class="log-tab active" data-pair="" onclick="filterLogs('', this)">Semua</button>
                     </div>
                     <div class="activity-log" id="activityLog">
                         <div class="empty-state">
@@ -279,7 +269,11 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">Jumlah Trading (IDR)</label>
-                    <input type="number" class="form-input" id="modalAmount" value="100000" min="10000">
+                    <input type="number" class="form-input" id="modalAmount" value="100000" min="10000" oninput="updateCoinConverter()">
+                    <div class="coin-converter" id="coinConverter" style="display:none">
+                        <span>≈ <strong id="coinConvertAmount">0</strong> <span id="coinConvertSymbol">COIN</span></span>
+                        <span style="color:var(--text-muted);font-size:11px">@ <span id="coinConvertPrice">-</span></span>
+                    </div>
                 </div>
             </div>
         </div>

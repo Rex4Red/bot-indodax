@@ -87,7 +87,6 @@ async function loadDashboard() {
         activeBots = status.bots || [];
         updateBotStatus(status.isRunning);
         document.getElementById('toggleBot').checked = status.isRunning;
-        document.getElementById('toggleSimulation').checked = !!settings.simulation_mode;
         document.getElementById('settingInterval').value = settings.check_interval;
 
         // Overview stats
@@ -145,14 +144,30 @@ function renderBotList() {
         const bg = COLORS[coin] || '#555';
         const pairLabel = bot.pair.replace('_', '/').toUpperCase();
         const hasPos = bot.position_amount > 0;
+        const simBadge = bot.simulation_mode ? '<span class="sim-badge">🔵 SIM</span>' : '<span class="live-badge">🟢 LIVE</span>';
+
+        // Price analysis
+        let analysisHtml = '';
+        if (hasPos && bot.buy_price > 0) {
+            const highDiff = bot.price_high ? bot.price_high - bot.buy_price : 0;
+            const highPct = bot.price_high ? ((highDiff / bot.buy_price) * 100).toFixed(2) : '0.00';
+            const lowDiff = bot.price_low ? bot.price_low - bot.buy_price : 0;
+            const lowPct = bot.price_low ? ((lowDiff / bot.buy_price) * 100).toFixed(2) : '0.00';
+            analysisHtml = `
+                <div class="price-analysis">
+                    <span class="analysis-item high">📈 High: ${formatIDR(bot.price_high || bot.buy_price)} <small>(${highPct >= 0 ? '+' : ''}${highPct}%)</small></span>
+                    <span class="analysis-item low">📉 Low: ${formatIDR(bot.price_low || bot.buy_price)} <small>(${lowPct >= 0 ? '+' : ''}${lowPct}%)</small></span>
+                </div>`;
+        }
 
         return `
-            <div class="bot-item" style="flex-wrap:wrap;cursor:pointer" onclick="openChartModal('${bot.pair}', '${coin.toUpperCase()}')" ontouchend="if(!event.target.closest('.bot-item-actions')){event.preventDefault();openChartModal('${bot.pair}', '${coin.toUpperCase()}');}">
+            <div class="bot-item" style="flex-wrap:wrap;cursor:pointer" onclick="openChartModal('${bot.pair}', '${coin.toUpperCase()}')" ontouchend="if(!event.target.closest('.bot-item-actions')&&!event.target.closest('.toggle')){event.preventDefault();openChartModal('${bot.pair}', '${coin.toUpperCase()}');}">
                 <div class="bot-item-left">
                     <div class="bot-item-logo" style="background:${bg}">${coin.substring(0, 2).toUpperCase()}</div>
                     <div class="bot-item-info">
                         <div class="bot-item-pair">
                             ${pairLabel}
+                            ${simBadge}
                             ${hasPos ? '<span class="has-position">HOLDING</span>' : ''}
                             ${!bot.is_active ? '<span style="color:var(--text-muted);font-size:10px;margin-left:4px">(Paused)</span>' : ''}
                         </div>
@@ -160,9 +175,14 @@ function renderBotList() {
                             Buy Dip: ${bot.buy_threshold}% | TP: ${bot.sell_profit}% | SL: ${bot.sell_loss}% | ${formatIDR(bot.trade_amount)}
                         </div>
                         ${hasPos ? `<div class="bot-item-params" style="color:var(--accent-green)">Holding: ${formatNumber(bot.position_amount)} ${coin.toUpperCase()} @ ${formatIDR(bot.buy_price)}</div>` : ''}
+                        ${analysisHtml}
                     </div>
                 </div>
                 <div class="bot-item-actions">
+                    <label class="toggle toggle-sm" title="Simulasi" onclick="event.stopPropagation()">
+                        <input type="checkbox" ${bot.simulation_mode ? 'checked' : ''} onchange="event.stopPropagation();toggleSimBot('${bot.id}', this.checked)">
+                        <span class="toggle-slider"></span>
+                    </label>
                     ${!hasPos
                         ? `<button class="btn-icon" title="Buy Manual" style="background:var(--accent-green-dim);color:var(--accent-green)" onclick="event.stopPropagation();manualBuy('${bot.id}','${pairLabel}')">🛒</button>`
                         : `<button class="btn-icon" title="Sell Manual" style="background:var(--accent-red-dim);color:var(--accent-red)" onclick="event.stopPropagation();manualSell('${bot.id}','${pairLabel}')">💰</button>`
@@ -232,6 +252,7 @@ function openAddModal(pair) {
     document.getElementById('modalAmount').value = 100000;
     document.getElementById('modalSaveBtn').textContent = '💾 Tambah Bot';
     document.getElementById('botConfigModal').style.display = 'flex';
+    updateCoinConverter();
 }
 
 function openEditModal(botId) {
@@ -246,10 +267,42 @@ function openEditModal(botId) {
     document.getElementById('modalAmount').value = bot.trade_amount;
     document.getElementById('modalSaveBtn').textContent = '💾 Simpan Perubahan';
     document.getElementById('botConfigModal').style.display = 'flex';
+    updateCoinConverter();
 }
 
 function closeModal() {
     document.getElementById('botConfigModal').style.display = 'none';
+    document.getElementById('coinConverter').style.display = 'none';
+}
+
+async function updateCoinConverter() {
+    const pair = document.getElementById('modalPair').value;
+    const amount = parseFloat(document.getElementById('modalAmount').value) || 0;
+    const converterEl = document.getElementById('coinConverter');
+    if (!pair || amount <= 0) { converterEl.style.display = 'none'; return; }
+
+    try {
+        const coin = pair.split('_')[0];
+        const price = await indodax_getCurrentPrice(pair);
+        if (!price) return;
+        const coinAmount = Math.floor((amount / price) * 1e8) / 1e8;
+        document.getElementById('coinConvertAmount').textContent = coinAmount.toFixed(8);
+        document.getElementById('coinConvertSymbol').textContent = coin.toUpperCase();
+        document.getElementById('coinConvertPrice').textContent = formatIDR(price);
+        converterEl.style.display = 'flex';
+    } catch { converterEl.style.display = 'none'; }
+}
+
+let _priceCache = {};
+async function indodax_getCurrentPrice(pair) {
+    // Cache for 10 seconds
+    if (_priceCache[pair] && Date.now() - _priceCache[pair].t < 10000) return _priceCache[pair].price;
+    try {
+        const data = await api(`/ticker/${pair}`);
+        const price = parseFloat(data?.ticker?.last || data?.last || 0);
+        if (price > 0) _priceCache[pair] = { price, t: Date.now() };
+        return price;
+    } catch { return 0; }
 }
 
 async function saveBotConfig() {
@@ -307,11 +360,11 @@ async function toggleBot() {
     }
 }
 
-async function toggleSimulation() {
-    const isChecked = document.getElementById('toggleSimulation').checked;
+async function toggleSimBot(botId, simMode) {
     try {
-        await api('/settings', { method: 'POST', body: { simulation_mode: isChecked ? 1 : 0 } });
-        showToast(isChecked ? 'Mode simulasi diaktifkan' : 'Mode LIVE diaktifkan ⚠️', isChecked ? 'info' : 'error');
+        await api(`/bots/${botId}`, { method: 'PUT', body: { simulation_mode: simMode ? 1 : 0 } });
+        showToast(simMode ? '🔵 Mode Simulasi diaktifkan' : '🟢 Mode LIVE diaktifkan ⚠️', simMode ? 'info' : 'error');
+        loadDashboard();
     } catch (err) { showToast(`Error: ${err.message}`, 'error'); }
 }
 
@@ -323,22 +376,53 @@ async function saveGlobalSettings() {
 }
 
 // ===== Activity Log =====
+let currentLogFilter = '';
+let allLogs = [];
+
 async function refreshLogs() {
     try {
-        const logs = await api('/logs');
-        const container = document.getElementById('activityLog');
-        if (!logs || logs.length === 0) {
-            container.innerHTML = '<div class="empty-state"><div class="icon">📝</div><p>Belum ada aktivitas. Mulai bot untuk melihat log.</p></div>';
-            return;
-        }
-        container.innerHTML = logs.map(log => `
-            <div class="log-entry">
-                <span class="log-time">${formatTimeShort(log.timestamp)}</span>
-                <span class="log-badge ${log.level}">${log.level}</span>
-                <span class="log-message">${log.message}</span>
-            </div>
-        `).join('');
+        allLogs = await api('/logs') || [];
+        updateLogTabs();
+        renderFilteredLogs();
     } catch (err) { console.error('Refresh logs error:', err); }
+}
+
+function updateLogTabs() {
+    const tabsEl = document.getElementById('logTabs');
+    // Get unique pairs from active bots
+    const pairs = (activeBots || []).map(b => b.pair);
+    let tabsHtml = `<button class="log-tab ${currentLogFilter === '' ? 'active' : ''}" onclick="filterLogs('', this)">Semua</button>`;
+    pairs.forEach(pair => {
+        const label = pair.replace('_', '/').toUpperCase();
+        tabsHtml += `<button class="log-tab ${currentLogFilter === pair ? 'active' : ''}" onclick="filterLogs('${pair}', this)">${label}</button>`;
+    });
+    tabsEl.innerHTML = tabsHtml;
+}
+
+function filterLogs(pair, btn) {
+    currentLogFilter = pair;
+    document.querySelectorAll('.log-tab').forEach(t => t.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    renderFilteredLogs();
+}
+
+function renderFilteredLogs() {
+    const container = document.getElementById('activityLog');
+    let logs = allLogs;
+    if (currentLogFilter) {
+        logs = logs.filter(l => l.pair === currentLogFilter);
+    }
+    if (!logs || logs.length === 0) {
+        container.innerHTML = '<div class="empty-state"><div class="icon">📝</div><p>Belum ada aktivitas untuk filter ini.</p></div>';
+        return;
+    }
+    container.innerHTML = logs.map(log => `
+        <div class="log-entry">
+            <span class="log-time">${formatTimeShort(log.timestamp)}</span>
+            <span class="log-badge ${log.level}">${log.level}</span>
+            <span class="log-message">${log.message}</span>
+        </div>
+    `).join('');
 }
 
 async function loadRecentTrades() {

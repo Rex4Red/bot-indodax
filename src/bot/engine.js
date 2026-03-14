@@ -39,8 +39,12 @@ class BotEngine extends EventEmitter {
         }
 
         this.isRunning = true;
-        this.log('info', `🤖 Bot dimulai! Mode: ${globalSettings.simulation_mode ? 'SIMULASI' : 'LIVE'}`);
-        this.log('info', `📊 Monitoring ${bots.length} coin: ${bots.map(b => b.pair.replace('_', '/').toUpperCase()).join(', ')}`);
+        this.log('info', `🤖 Bot dimulai!`);
+        this.log('info', `📊 Monitoring ${bots.length} coin: ${bots.map(b => {
+            const mode = b.simulation_mode ? 'SIM' : 'LIVE';
+            return b.pair.replace('_', '/').toUpperCase() + ' [' + mode + ']';
+        }).join(', ')}`);
+
 
         // Set reference prices for bots that don't have one
         for (const bot of bots) {
@@ -106,6 +110,12 @@ class BotEngine extends EventEmitter {
             const changePct = strategy.calculateChangePercent(currentPrice, bot.buy_price);
             this.log('info', `💰 ${pairLabel}: ${strategy.formatIDR(currentPrice)} (P: ${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%)`, bot.pair);
 
+            // Track price high/low since buy
+            const updates = {};
+            if (currentPrice > (bot.price_high || 0)) updates.price_high = currentPrice;
+            if (bot.price_low === 0 || currentPrice < bot.price_low) updates.price_low = currentPrice;
+            if (Object.keys(updates).length > 0) db.updateBot(bot.id, updates);
+
             if (strategy.shouldSellProfit(currentPrice, bot.buy_price, bot.sell_profit)) {
                 await this.executeSell(bot, globalSettings, currentPrice, 'take_profit');
             } else if (strategy.shouldSellLoss(currentPrice, bot.buy_price, bot.sell_loss)) {
@@ -132,7 +142,7 @@ class BotEngine extends EventEmitter {
         let orderId = null;
         let status = 'executed';
 
-        if (!globalSettings.simulation_mode) {
+        if (!bot.simulation_mode) {
             try {
                 const result = await indodax.trade(bot.pair, 'buy', currentPrice, coinAmount, 'limit');
                 orderId = result.order_id?.toString();
@@ -150,7 +160,9 @@ class BotEngine extends EventEmitter {
             db.updateBot(bot.id, {
                 buy_price: currentPrice,
                 position_amount: coinAmount,
-                position_coin: coin
+                position_coin: coin,
+                price_high: currentPrice,
+                price_low: currentPrice
             });
         }
 
@@ -162,7 +174,7 @@ class BotEngine extends EventEmitter {
             total: bot.trade_amount,
             status,
             order_id: orderId,
-            is_simulation: globalSettings.simulation_mode,
+            is_simulation: bot.simulation_mode ? 1 : 0,
             bot_id: bot.id,
             notes: status === 'failed' ? `FAILED: Buy attempt at ${strategy.formatIDR(currentPrice)}` : `Buy dip at ${strategy.calculateChangePercent(currentPrice, bot.reference_price).toFixed(2)}%`
         });
@@ -187,7 +199,7 @@ class BotEngine extends EventEmitter {
         let orderId = null;
         let status = 'executed';
 
-        if (!globalSettings.simulation_mode) {
+        if (!bot.simulation_mode) {
             try {
                 const result = await indodax.trade(bot.pair, 'sell', currentPrice, bot.position_amount, 'limit');
                 orderId = result.order_id?.toString();
@@ -206,7 +218,9 @@ class BotEngine extends EventEmitter {
                 buy_price: 0,
                 position_amount: 0,
                 position_coin: '',
-                reference_price: currentPrice
+                reference_price: currentPrice,
+                price_high: 0,
+                price_low: 0
             });
         }
 
@@ -220,7 +234,7 @@ class BotEngine extends EventEmitter {
             profit_loss_pct: status !== 'failed' ? pl.percentage : 0,
             status,
             order_id: orderId,
-            is_simulation: globalSettings.simulation_mode,
+            is_simulation: bot.simulation_mode ? 1 : 0,
             bot_id: bot.id,
             notes: status === 'failed' ? `FAILED: Sell attempt at ${strategy.formatIDR(currentPrice)}` : `${reason}: ${pl.percentage.toFixed(2)}%`
         });
@@ -278,7 +292,6 @@ class BotEngine extends EventEmitter {
         const stats = db.getTradeStats();
         return {
             isRunning: this.isRunning,
-            simulation: !!globalSettings.simulation_mode,
             checkInterval: globalSettings.check_interval,
             activeBots: bots.filter(b => b.is_active).length,
             totalBots: bots.length,
