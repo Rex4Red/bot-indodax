@@ -5,7 +5,7 @@ const db = require('./src/database/db');
 const apiRoutes = require('./src/routes/api');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 
 // Initialize database
 db.init();
