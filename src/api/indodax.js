@@ -167,6 +167,10 @@ async function getDepth(pairId) {
     return publicRequest(`/api/depth/${pairId}`);
 }
 
+async function getTrades(pairId) {
+    return publicRequest(`/api/trades/${pairId}`);
+}
+
 async function getServerTime() {
     return publicRequest('/api/server_time');
 }
@@ -210,6 +214,7 @@ module.exports = {
     getPairs,
     getSummaries,
     getDepth,
+    getTrades,
     getServerTime,
     getPriceIncrements,
     getCurrentPrice,

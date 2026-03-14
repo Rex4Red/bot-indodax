@@ -147,7 +147,7 @@ function renderBotList() {
         const hasPos = bot.position_amount > 0;
 
         return `
-            <div class="bot-item" style="flex-wrap:wrap">
+            <div class="bot-item" style="flex-wrap:wrap;cursor:pointer" onclick="openChartModal('${bot.pair}', '${coin.toUpperCase()}')">
                 <div class="bot-item-left">
                     <div class="bot-item-logo" style="background:${bg}">${coin.substring(0, 2).toUpperCase()}</div>
                     <div class="bot-item-info">
@@ -164,14 +164,14 @@ function renderBotList() {
                 </div>
                 <div class="bot-item-actions">
                     ${!hasPos
-                        ? `<button class="btn-icon" title="Buy Manual" style="background:var(--accent-green-dim);color:var(--accent-green)" onclick="manualBuy('${bot.id}','${pairLabel}')">🛒</button>`
-                        : `<button class="btn-icon" title="Sell Manual" style="background:var(--accent-red-dim);color:var(--accent-red)" onclick="manualSell('${bot.id}','${pairLabel}')">💰</button>`
+                        ? `<button class="btn-icon" title="Buy Manual" style="background:var(--accent-green-dim);color:var(--accent-green)" onclick="event.stopPropagation();manualBuy('${bot.id}','${pairLabel}')">🛒</button>`
+                        : `<button class="btn-icon" title="Sell Manual" style="background:var(--accent-red-dim);color:var(--accent-red)" onclick="event.stopPropagation();manualSell('${bot.id}','${pairLabel}')">💰</button>`
                     }
-                    <button class="btn-icon" title="Edit" onclick="openEditModal('${bot.id}')">✏️</button>
-                    <button class="btn-icon" title="${bot.is_active ? 'Pause' : 'Resume'}" onclick="toggleBotActive('${bot.id}', ${!bot.is_active})">
+                    <button class="btn-icon" title="Edit" onclick="event.stopPropagation();openEditModal('${bot.id}')">✏️</button>
+                    <button class="btn-icon" title="${bot.is_active ? 'Pause' : 'Resume'}" onclick="event.stopPropagation();toggleBotActive('${bot.id}', ${!bot.is_active})">
                         ${bot.is_active ? '⏸️' : '▶️'}
                     </button>
-                    <button class="btn-icon danger" title="Hapus" onclick="removeBot('${bot.id}', '${pairLabel}')">🗑️</button>
+                    <button class="btn-icon danger" title="Hapus" onclick="event.stopPropagation();removeBot('${bot.id}', '${pairLabel}')">🗑️</button>
                 </div>
             </div>
         `;
@@ -421,7 +421,7 @@ function renderPairs() {
         const isPositive = changePct >= 0;
 
         return `
-            <div class="pair-card">
+            <div class="pair-card" onclick="openChartModal('${p.ticker_id}', '${(p.name || coin.toUpperCase()).replace(/'/g, "\\'")}')">
                 <div class="pair-card-top">
                     <div class="pair-info">
                         ${p.url_logo_png
@@ -433,7 +433,7 @@ function renderPairs() {
                             <div class="pair-symbol">${p.name || coin.toUpperCase()}</div>
                         </div>
                     </div>
-                    <button class="favorite-btn ${isFav ? 'active' : ''}" onclick="toggleFavorite('${p.ticker_id}')">
+                    <button class="favorite-btn ${isFav ? 'active' : ''}" onclick="event.stopPropagation();toggleFavorite('${p.ticker_id}')">
                         ${isFav ? '★' : '☆'}
                     </button>
                 </div>
@@ -445,7 +445,7 @@ function renderPairs() {
                 <div class="pair-card-bottom">
                     ${p.hasBot
                         ? '<span style="color:var(--accent-green);font-size:12px;font-weight:600">✅ Bot Aktif</span>'
-                        : `<button class="btn-select" onclick="openAddModal('${p.ticker_id}')">+ Tambah Bot</button>`
+                        : `<button class="btn-select" onclick="event.stopPropagation();openAddModal('${p.ticker_id}')">+ Tambah Bot</button>`
                     }
                 </div>
             </div>
@@ -530,4 +530,199 @@ function startAutoRefresh() {
 document.addEventListener('DOMContentLoaded', () => {
     loadDashboard();
     startAutoRefresh();
+});
+
+// ===== Chart Modal =====
+let chartInstance = null;
+let chartCandleSeries = null;
+let chartCurrentPair = null;
+let chartCurrentInterval = 1;
+let chartRefreshTimer = null;
+
+async function openChartModal(pair, name) {
+    chartCurrentPair = pair;
+    chartCurrentInterval = 1;
+
+    // Reset timeframe buttons
+    document.querySelectorAll('.tf-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector('.tf-btn[data-tf="1"]').classList.add('active');
+
+    // Set header info
+    const coin = pair.split('_')[0];
+    const bgColor = COLORS[coin] || '#555';
+    document.getElementById('chartCoinLogo').style.background = bgColor;
+    document.getElementById('chartCoinLogo').textContent = coin.substring(0, 2).toUpperCase();
+    document.getElementById('chartCoinName').textContent = pair.replace('_', '/').toUpperCase();
+    document.getElementById('chartCoinSub').textContent = name || coin.toUpperCase();
+
+    // Show modal
+    document.getElementById('chartModal').style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+
+    // Clear old chart
+    const container = document.getElementById('chartContainer');
+    container.innerHTML = '<div class="empty-state"><div class="spinner"></div><p style="margin-top:12px">Memuat chart...</p></div>';
+
+    // Small delay to ensure modal is visible before creating chart
+    await new Promise(r => setTimeout(r, 100));
+
+    // Create chart
+    createChart(container);
+
+    // Load data
+    await loadChartData();
+
+    // Start auto-refresh
+    chartRefreshTimer = setInterval(() => loadChartData(), 10000);
+}
+
+function createChart(container) {
+    container.innerHTML = '';
+
+    chartInstance = LightweightCharts.createChart(container, {
+        width: container.clientWidth,
+        height: container.clientHeight,
+        layout: {
+            background: { type: 'solid', color: '#0a0a0a' },
+            textColor: '#a0a0a0',
+            fontFamily: 'Inter, sans-serif',
+            fontSize: 12,
+        },
+        grid: {
+            vertLines: { color: 'rgba(255,255,255,0.04)' },
+            horzLines: { color: 'rgba(255,255,255,0.04)' },
+        },
+        crosshair: {
+            mode: LightweightCharts.CrosshairMode.Normal,
+            vertLine: { color: 'rgba(0,212,255,0.3)', width: 1, style: 2 },
+            horzLine: { color: 'rgba(0,212,255,0.3)', width: 1, style: 2 },
+        },
+        rightPriceScale: {
+            borderColor: 'rgba(255,255,255,0.08)',
+            scaleMargins: { top: 0.1, bottom: 0.1 },
+        },
+        timeScale: {
+            borderColor: 'rgba(255,255,255,0.08)',
+            timeVisible: true,
+            secondsVisible: false,
+        },
+        handleScroll: { mouseWheel: true, pressedMouseMove: true },
+        handleScale: { mouseWheel: true, pinch: true },
+    });
+
+    chartCandleSeries = chartInstance.addCandlestickSeries({
+        upColor: '#00ff88',
+        downColor: '#ff4444',
+        borderUpColor: '#00ff88',
+        borderDownColor: '#ff4444',
+        wickUpColor: '#00ff88',
+        wickDownColor: '#ff4444',
+    });
+
+    // Handle resize
+    const resizeObserver = new ResizeObserver(() => {
+        if (chartInstance) {
+            chartInstance.applyOptions({
+                width: container.clientWidth,
+                height: container.clientHeight
+            });
+        }
+    });
+    resizeObserver.observe(container);
+    container._resizeObserver = resizeObserver;
+}
+
+async function loadChartData() {
+    if (!chartCurrentPair) return;
+
+    try {
+        const data = await api(`/chart/${chartCurrentPair}?interval=${chartCurrentInterval}`);
+
+        // Update candles
+        if (data.candles && data.candles.length > 0) {
+            chartCandleSeries.setData(data.candles);
+            chartInstance.timeScale().fitContent();
+        }
+
+        // Update ticker info
+        if (data.ticker) {
+            document.getElementById('chartPrice').textContent = formatIDR(data.ticker.last);
+            document.getElementById('chartHigh').textContent = `H: ${formatIDR(data.ticker.high)}`;
+            document.getElementById('chartLow').textContent = `L: ${formatIDR(data.ticker.low)}`;
+            document.getElementById('chartVol').textContent = `Vol: ${parseFloat(data.ticker.vol).toLocaleString('id-ID')}`;
+        }
+
+        // Update depth
+        if (data.depth) {
+            renderDepth(data.depth);
+        }
+    } catch (err) {
+        console.error('Chart data error:', err);
+    }
+}
+
+function renderDepth(depth) {
+    const container = document.getElementById('chartDepth');
+    const bidRows = (depth.bids || []).map(b => `
+        <div class="depth-row">
+            <span class="price-bid">${formatIDR(parseFloat(b[0]))}</span>
+            <span>${parseFloat(b[1]).toFixed(4)}</span>
+        </div>
+    `).join('');
+
+    const askRows = (depth.asks || []).map(a => `
+        <div class="depth-row">
+            <span class="price-ask">${formatIDR(parseFloat(a[0]))}</span>
+            <span>${parseFloat(a[1]).toFixed(4)}</span>
+        </div>
+    `).join('');
+
+    container.innerHTML = `
+        <div class="depth-side">
+            <div class="depth-title bids">📗 Bids (Buy)</div>
+            ${bidRows || '<div class="depth-row" style="color:var(--text-muted)">No data</div>'}
+        </div>
+        <div class="depth-side">
+            <div class="depth-title asks">📕 Asks (Sell)</div>
+            ${askRows || '<div class="depth-row" style="color:var(--text-muted)">No data</div>'}
+        </div>
+    `;
+}
+
+function changeTimeframe(tf, btn) {
+    chartCurrentInterval = tf;
+    document.querySelectorAll('.tf-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    loadChartData();
+}
+
+function closeChartModal() {
+    document.getElementById('chartModal').style.display = 'none';
+    document.body.style.overflow = '';
+
+    if (chartRefreshTimer) {
+        clearInterval(chartRefreshTimer);
+        chartRefreshTimer = null;
+    }
+
+    const container = document.getElementById('chartContainer');
+    if (container._resizeObserver) {
+        container._resizeObserver.disconnect();
+        container._resizeObserver = null;
+    }
+
+    if (chartInstance) {
+        chartInstance.remove();
+        chartInstance = null;
+        chartCandleSeries = null;
+    }
+
+    chartCurrentPair = null;
+}
+
+// Close chart modal on overlay click
+document.addEventListener('click', (e) => {
+    if (e.target.classList.contains('chart-modal-overlay')) {
+        closeChartModal();
+    }
 });

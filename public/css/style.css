@@ -82,6 +82,7 @@ body {
 .navbar-brand .brand-text {
     background: linear-gradient(90deg, var(--accent-cyan), #ffffff);
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
 }
 
@@ -1022,4 +1023,226 @@ tbody tr:hover {
     .modal-content { max-width: 100%; }
     .bot-item { flex-wrap: wrap; gap: 8px; }
     .bot-item-price { text-align: left; margin-right: 0; }
+}
+
+/* ===== Chart Modal ===== */
+.chart-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(12px);
+    z-index: 300;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.chart-modal {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    width: 100%;
+    max-width: 900px;
+    max-height: 90vh;
+    overflow: hidden;
+    animation: modalIn 0.3s ease;
+    display: flex;
+    flex-direction: column;
+}
+
+.chart-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--border-color);
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.chart-modal-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.chart-coin-logo {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: 700;
+    color: #000;
+    background: var(--accent-cyan);
+}
+
+.chart-coin-name {
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.chart-coin-sub {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.chart-price-info {
+    text-align: right;
+    flex: 1;
+}
+
+.chart-price {
+    font-size: 24px;
+    font-weight: 800;
+    background: linear-gradient(90deg, #fff, var(--accent-cyan));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.chart-price-detail {
+    display: flex;
+    gap: 14px;
+    font-size: 12px;
+    font-weight: 500;
+    justify-content: flex-end;
+    margin-top: 2px;
+}
+
+.chart-modal-close {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+    transition: all 0.2s;
+}
+
+.chart-modal-close:hover {
+    background: var(--accent-red-dim);
+    color: var(--accent-red);
+    border-color: var(--accent-red);
+}
+
+.chart-timeframes {
+    display: flex;
+    gap: 6px;
+    padding: 12px 24px;
+    border-bottom: 1px solid var(--border-color);
+    background: rgba(0,0,0,0.2);
+}
+
+.tf-btn {
+    padding: 6px 18px;
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.tf-btn:hover {
+    border-color: var(--accent-cyan);
+    color: var(--text-primary);
+}
+
+.tf-btn.active {
+    background: var(--accent-cyan);
+    color: #000;
+    border-color: var(--accent-cyan);
+    box-shadow: 0 0 12px rgba(0, 212, 255, 0.3);
+}
+
+.chart-container {
+    width: 100%;
+    height: 400px;
+    position: relative;
+    background: var(--bg-primary);
+}
+
+.chart-depth {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    border-top: 1px solid var(--border-color);
+    background: var(--border-color);
+}
+
+.depth-side {
+    background: var(--bg-card);
+    padding: 14px 20px;
+}
+
+.depth-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+}
+
+.depth-title.bids { color: var(--accent-green); }
+.depth-title.asks { color: var(--accent-red); }
+
+.depth-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    padding: 3px 0;
+    color: var(--text-secondary);
+}
+
+.depth-row .price-bid { color: var(--accent-green); font-weight: 600; }
+.depth-row .price-ask { color: var(--accent-red); font-weight: 600; }
+
+/* Clickable pair card */
+.pair-card-clickable {
+    cursor: pointer;
+}
+
+@media (max-width: 768px) {
+    .chart-modal {
+        max-height: 95vh;
+        border-radius: var(--radius);
+    }
+    .chart-modal-header {
+        padding: 14px 16px;
+    }
+    .chart-price {
+        font-size: 18px;
+    }
+    .chart-price-info {
+        text-align: left;
+    }
+    .chart-price-detail {
+        justify-content: flex-start;
+    }
+    .chart-container {
+        height: 300px;
+    }
+    .chart-timeframes {
+        padding: 10px 16px;
+    }
+    .depth-side {
+        padding: 10px 14px;
+    }
+    .chart-modal-overlay {
+        padding: 8px;
+    }
 }

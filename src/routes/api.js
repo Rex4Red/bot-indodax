@@ -226,4 +226,85 @@ router.post('/bot/reset', (req, res) => {
     }
 });
 
+// === Chart Data (OHLC from public trades) ===
+router.get('/chart/:pair', async (req, res) => {
+    try {
+        const pair = req.params.pair; // e.g. 'btc_idr'
+        const interval = parseInt(req.query.interval) || 1; // minutes
+        const pairId = indodax.pairToId(pair);
+
+        // Fetch trades and ticker in parallel
+        const [trades, tickerData, depthData] = await Promise.all([
+            indodax.getTrades(pairId),
+            indodax.getTicker(pairId),
+            indodax.getDepth(pairId)
+        ]);
+
+        // Aggregate trades into OHLC candles
+        const candles = [];
+        if (Array.isArray(trades) && trades.length > 0) {
+            const intervalMs = interval * 60 * 1000;
+            const sortedTrades = trades.sort((a, b) => parseInt(a.date) - parseInt(b.date));
+
+            let currentBucket = Math.floor(parseInt(sortedTrades[0].date) * 1000 / intervalMs) * intervalMs;
+            let open = parseFloat(sortedTrades[0].price);
+            let high = open, low = open, close = open;
+
+            for (const trade of sortedTrades) {
+                const tradeTime = parseInt(trade.date) * 1000;
+                const tradeBucket = Math.floor(tradeTime / intervalMs) * intervalMs;
+                const price = parseFloat(trade.price);
+
+                if (tradeBucket !== currentBucket) {
+                    candles.push({
+                        time: Math.floor(currentBucket / 1000),
+                        open, high, low, close
+                    });
+                    currentBucket = tradeBucket;
+                    open = price;
+                    high = price;
+                    low = price;
+                    close = price;
+                } else {
+                    high = Math.max(high, price);
+                    low = Math.min(low, price);
+                    close = price;
+                }
+            }
+            // Push last candle
+            candles.push({
+                time: Math.floor(currentBucket / 1000),
+                open, high, low, close
+            });
+        }
+
+        // Ticker info
+        const ticker = tickerData?.ticker || {};
+
+        // Depth summary (top 5 bids/asks)
+        const depth = {
+            bids: (depthData?.buy || []).slice(0, 5),
+            asks: (depthData?.sell || []).slice(0, 5)
+        };
+
+        res.json({
+            success: true,
+            data: {
+                candles,
+                ticker: {
+                    last: parseFloat(ticker.last || 0),
+                    high: parseFloat(ticker.high || 0),
+                    low: parseFloat(ticker.low || 0),
+                    buy: parseFloat(ticker.buy || 0),
+                    sell: parseFloat(ticker.sell || 0),
+                    vol: ticker[`vol_${pair.split('_')[0]}`] || '0'
+                },
+                depth
+            }
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 module.exports = router;
