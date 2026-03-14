@@ -1,0 +1,22 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: 3.107.211.52
+          username: ubuntu
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd ~/bot-indodax
+            GIT_SSH_COMMAND='ssh -i ~/.ssh/deploy_key_bot_indodax -o StrictHostKeyChecking=no' git pull origin main
+            npm install
+            pm2 restart bot-indodax
+            echo 'Deploy complete!'
