@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Indodax Multi-Coin Auto Trading Bot Dashboard">
+    <title>INDODAX BOT - Multi-Coin Trading Dashboard</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar">
+    <div style="display:flex;align-items:center">
+        <a href="#" class="navbar-brand" onclick="navigateTo('dashboard')">
+            <span class="logo-icon">🤖</span>
+            <span class="brand-text">INDODAX BOT</span>
+        </a>
+        <div class="navbar-status stopped" id="botStatusBadge">
+            <span class="dot"></span>
+            <span id="botStatusText">STOPPED</span>
+        </div>
+    </div>
+
+    <div class="navbar-nav" id="navbarNav">
+        <a class="nav-link active" data-page="dashboard" onclick="navigateTo('dashboard')">Dashboard</a>
+        <a class="nav-link" data-page="pairs" onclick="navigateTo('pairs')">Tambah Coin</a>
+        <a class="nav-link" data-page="history" onclick="navigateTo('history')">History</a>
+    </div>
+
+    <div class="navbar-right">
+        <div class="connection-badge" id="connectionBadge">
+            <span class="dot"></span>
+            <span>Connected</span>
+        </div>
+        <button class="hamburger" onclick="toggleMobileMenu()">☰</button>
+    </div>
+</nav>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- ===== DASHBOARD PAGE ===== -->
+<div class="main-content">
+    <div class="page active" id="page-dashboard">
+
+        <!-- Overview Cards -->
+        <div class="overview-grid">
+            <div class="overview-card">
+                <div class="card-label">Total P/L</div>
+                <div class="card-value" id="totalPL">Rp 0</div>
+                <div class="card-change" id="totalPLChange">~</div>
+            </div>
+            <div class="overview-card">
+                <div class="card-label">Saldo IDR</div>
+                <div class="card-value" id="idrBalance">Rp 0</div>
+                <div class="card-change" style="color:var(--text-muted)">💰 Available</div>
+            </div>
+            <div class="overview-card">
+                <div class="card-label">Bot Aktif</div>
+                <div class="card-value" id="activeBotCount">0</div>
+                <div class="card-change" style="color:var(--text-muted)">🤖 Monitoring</div>
+            </div>
+            <div class="overview-card">
+                <div class="card-label">Total Trading</div>
+                <div class="card-value" id="totalTrades">0</div>
+                <div class="card-change" id="winRateLabel" style="color:var(--text-muted)">📊 Win Rate: 0%</div>
+            </div>
+        </div>
+
+        <!-- Global Control + Active Bots -->
+        <div class="section-grid">
+            <!-- Global Bot Control -->
+            <div>
+                <div class="card" style="margin-bottom:16px">
+                    <div class="card-header">
+                        <div class="card-title">⚙️ Kontrol Global</div>
+                    </div>
+                    <div class="bot-control-item">
+                        <div class="bot-control-info">
+                            <div class="bot-control-icon bot">🤖</div>
+                            <div>
+                                <div class="bot-control-label">Start/Stop Semua Bot</div>
+                                <div class="bot-control-desc" id="botRunningDesc">Bot tidak aktif</div>
+                            </div>
+                        </div>
+                        <label class="toggle">
+                            <input type="checkbox" id="toggleBot" onchange="toggleBot()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="bot-control-item">
+                        <div class="bot-control-info">
+                            <div class="bot-control-icon sim">🔬</div>
+                            <div>
+                                <div class="bot-control-label">Mode Simulasi</div>
+                                <div class="bot-control-desc">Trading tanpa dana riil</div>
+                            </div>
+                        </div>
+                        <label class="toggle">
+                            <input type="checkbox" id="toggleSimulation" checked onchange="toggleSimulation()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div style="margin-top:12px">
+                        <div class="form-group">
+                            <label class="form-label">Interval Cek (detik)</label>
+                            <select class="form-select" id="settingInterval" onchange="saveGlobalSettings()">
+                                <option value="5">5 detik</option>
+                                <option value="10" selected>10 detik</option>
+                                <option value="30">30 detik</option>
+                                <option value="60">1 menit</option>
+                                <option value="300">5 menit</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Activity Log -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">📋 Log Aktivitas</div>
+                        <button class="btn btn-outline" style="font-size:12px;padding:4px 12px" onclick="refreshLogs()">Refresh</button>
+                    </div>
+                    <div class="activity-log" id="activityLog">
+                        <div class="empty-state">
+                            <div class="icon">📝</div>
+                            <p>Belum ada aktivitas. Mulai bot untuk melihat log.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active Bot List -->
+            <div>
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">💎 Daftar Bot Coin</div>
+                        <button class="btn btn-primary" style="font-size:12px;padding:6px 14px" onclick="navigateTo('pairs')">+ Tambah Coin</button>
+                    </div>
+                    <div id="botListContainer">
+                        <div class="empty-state">
+                            <div class="icon">🤖</div>
+                            <p>Belum ada bot. Klik "Tambah Coin" untuk memulai.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Trades -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">📜 Riwayat Trading Terbaru</div>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Waktu</th>
+                            <th>Pair</th>
+                            <th>Tipe</th>
+                            <th>Harga</th>
+                            <th>Jumlah</th>
+                            <th>Total</th>
+                            <th>P/L</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recentTradesBody">
+                        <tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:30px">Belum ada trading</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== PAIRS PAGE (Add Coin) ===== -->
+    <div class="page" id="page-pairs">
+        <div class="pairs-header">
+            <h2>Tambah Coin untuk Bot</h2>
+            <p>Pilih coin yang ingin kamu tradingkan otomatis</p>
+        </div>
+
+        <div class="search-bar">
+            <span class="search-icon">🔍</span>
+            <input type="text" placeholder="Cari coin (mis. BTC, ETH)..." id="pairSearch" oninput="filterPairs()">
+        </div>
+
+        <div class="filter-tabs">
+            <button class="filter-tab active" data-filter="all" onclick="setFilter('all', this)">Semua</button>
+            <button class="filter-tab" data-filter="idr" onclick="setFilter('idr', this)">IDR Market</button>
+            <button class="filter-tab" data-filter="usdt" onclick="setFilter('usdt', this)">USDT Market</button>
+            <button class="filter-tab" data-filter="favorites" onclick="setFilter('favorites', this)">Favorit ⭐</button>
+        </div>
+
+        <div class="pairs-grid" id="pairsGrid">
+            <div class="empty-state"><div class="spinner"></div><p style="margin-top:12px">Memuat daftar coin...</p></div>
+        </div>
+    </div>
+
+    <!-- ===== HISTORY PAGE ===== -->
+    <div class="page" id="page-history">
+        <div class="pairs-header">
+            <h2>Riwayat Trading</h2>
+            <p>Semua riwayat trading dari semua bot</p>
+        </div>
+
+        <div class="history-stats">
+            <div class="overview-card">
+                <div class="card-label">Total Trading</div>
+                <div class="card-value" id="statTotalTrades">0</div>
+            </div>
+            <div class="overview-card">
+                <div class="card-label">Total P/L</div>
+                <div class="card-value" id="statTotalPL">Rp 0</div>
+            </div>
+            <div class="overview-card">
+                <div class="card-label">Win Rate</div>
+                <div class="card-value" id="statWinRate">0%</div>
+            </div>
+            <div class="overview-card">
+                <div class="card-label">Win / Loss</div>
+                <div class="card-value" id="statWinLoss">0 / 0</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">📋 Semua Trading</div>
+                <button class="btn btn-outline" style="font-size:12px;padding:4px 12px" onclick="loadTradeHistory()">Refresh</button>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Waktu</th>
+                            <th>Pair</th>
+                            <th>Tipe</th>
+                            <th>Harga</th>
+                            <th>Jumlah</th>
+                            <th>Total</th>
+                            <th>P/L</th>
+                            <th>P/L %</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyTradesBody">
+                        <tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:30px">Belum ada riwayat trading</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bot Config Modal -->
+<div class="modal-overlay" id="botConfigModal" style="display:none">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="modalTitle">Tambah Bot - BTC/IDR</h3>
+            <button class="modal-close" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="modalPair">
+            <input type="hidden" id="modalBotId">
+            <div class="settings-grid">
+                <div class="form-group">
+                    <label class="form-label">Buy Dip (%)</label>
+                    <input type="number" class="form-input" id="modalBuyDip" value="3" step="0.1" min="0.1">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Take Profit (%)</label>
+                    <input type="number" class="form-input" id="modalTakeProfit" value="5" step="0.1" min="0.1">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Stop Loss (%)</label>
+                    <input type="number" class="form-input" id="modalStopLoss" value="2" step="0.1" min="0.1">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Jumlah Trading (IDR)</label>
+                    <input type="number" class="form-input" id="modalAmount" value="100000" min="10000">
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeModal()">Batal</button>
+            <button class="btn btn-primary" id="modalSaveBtn" onclick="saveBotConfig()">💾 Simpan & Mulai</button>
+        </div>
+    </div>
+</div>
+
+<!-- Mobile Bottom Navigation -->
+<nav class="mobile-nav">
+    <div class="mobile-nav-items">
+        <button class="mobile-nav-item active" data-page="dashboard" onclick="navigateTo('dashboard')">
+            <span class="icon">📊</span>
+            <span>Dashboard</span>
+        </button>
+        <button class="mobile-nav-item" data-page="pairs" onclick="navigateTo('pairs')">
+            <span class="icon">➕</span>
+            <span>Tambah</span>
+        </button>
+        <button class="mobile-nav-item" data-page="history" onclick="navigateTo('history')">
+            <span class="icon">📜</span>
+            <span>Riwayat</span>
+        </button>
+    </div>
+</nav>
+
+<script src="/js/app.js"></script>
+</body>
+</html>
