@@ -8,6 +8,7 @@ class BotEngine extends EventEmitter {
         super();
         this.interval = null;
         this.isRunning = false;
+        this.tickInProgress = false;
         this.logs = [];
         this.maxLogs = 300;
     }
@@ -81,22 +82,26 @@ class BotEngine extends EventEmitter {
 
     async tick() {
         if (!this.isRunning) return;
+        if (this.tickInProgress) return; // Prevent overlapping ticks
+        this.tickInProgress = true;
 
-        const globalSettings = db.getGlobalSettings();
-        const bots = db.getBots().filter(b => b.is_active);
+        try {
+            const globalSettings = db.getGlobalSettings();
+            const bots = db.getBots().filter(b => b.is_active);
 
-        // Process each bot with a small delay between them to avoid rate limiting
-        for (let i = 0; i < bots.length; i++) {
-            if (!this.isRunning) break;
-            try {
-                await this.processSingleBot(bots[i], globalSettings);
-            } catch (err) {
-                this.log('error', `❌ Error ${bots[i].pair}: ${err.message}`, bots[i].pair);
+            for (let i = 0; i < bots.length; i++) {
+                if (!this.isRunning) break;
+                try {
+                    await this.processSingleBot(bots[i], globalSettings);
+                } catch (err) {
+                    this.log('error', `❌ Error ${bots[i].pair}: ${err.message}`, bots[i].pair);
+                }
+                if (i < bots.length - 1) {
+                    await new Promise(r => setTimeout(r, 200));
+                }
             }
-            // Small delay between API calls to avoid rate limiting
-            if (i < bots.length - 1) {
-                await new Promise(r => setTimeout(r, 200));
-            }
+        } finally {
+            this.tickInProgress = false;
         }
     }
 
@@ -132,6 +137,13 @@ class BotEngine extends EventEmitter {
     }
 
     async executeBuy(bot, globalSettings, currentPrice) {
+        // Re-read fresh bot data to prevent duplicate buys
+        const freshBot = db.getBot(bot.id);
+        if (freshBot && freshBot.position_amount > 0) {
+            this.log('info', `⚠️ [${bot.pair.replace('_', '/').toUpperCase()}] Sudah HOLDING, skip buy`, bot.pair);
+            return;
+        }
+
         const coin = bot.pair.split('_')[0];
         const coinAmount = strategy.calculateCoinAmount(bot.trade_amount, currentPrice);
         const pairLabel = bot.pair.replace('_', '/').toUpperCase();
