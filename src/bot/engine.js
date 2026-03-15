@@ -137,16 +137,26 @@ class BotEngine extends EventEmitter {
         const pairLabel = bot.pair.replace('_', '/').toUpperCase();
 
         this.log('buy', `🟢 [${pairLabel}] SINYAL BUY! Harga turun ${bot.buy_threshold}% dari referensi`, bot.pair);
-        this.log('buy', `💵 [${pairLabel}] Membeli ${coinAmount.toFixed(8)} ${coin.toUpperCase()} @ ${strategy.formatIDR(currentPrice)}`, bot.pair);
+        this.log('buy', `💵 [${pairLabel}] Membeli ~${coinAmount.toFixed(8)} ${coin.toUpperCase()} @ ${strategy.formatIDR(currentPrice)}`, bot.pair);
 
         let orderId = null;
         let status = 'executed';
+        let actualAmount = coinAmount;
+        let actualPrice = currentPrice;
 
         if (!bot.simulation_mode) {
             try {
-                const result = await indodax.trade(bot.pair, 'buy', currentPrice, coinAmount, 'limit');
+                // Market order: pass IDR amount for buy, gets filled instantly
+                const result = await indodax.trade(bot.pair, 'buy', currentPrice, bot.trade_amount, 'market');
                 orderId = result.order_id?.toString();
-                this.log('buy', `✅ [${pairLabel}] Order BUY berhasil! ID: ${orderId}`, bot.pair);
+                // Get actual filled amount from response
+                if (result.receive_coin) {
+                    actualAmount = parseFloat(result.receive_coin[coin] || actualAmount);
+                }
+                if (result.spend_rp) {
+                    actualPrice = Math.round(parseFloat(result.spend_rp) / actualAmount);
+                }
+                this.log('buy', `✅ [${pairLabel}] Market BUY berhasil! Dapat ${actualAmount.toFixed(8)} ${coin.toUpperCase()}`, bot.pair);
             } catch (err) {
                 this.log('error', `❌ [${pairLabel}] Gagal membeli: ${err.message}`, bot.pair);
                 status = 'failed';
@@ -158,11 +168,11 @@ class BotEngine extends EventEmitter {
         // Only update bot position if trade succeeded or in simulation
         if (status !== 'failed') {
             db.updateBot(bot.id, {
-                buy_price: currentPrice,
-                position_amount: coinAmount,
+                buy_price: actualPrice,
+                position_amount: actualAmount,
                 position_coin: coin,
-                price_high: currentPrice,
-                price_low: currentPrice
+                price_high: actualPrice,
+                price_low: actualPrice
             });
         }
 
@@ -201,9 +211,10 @@ class BotEngine extends EventEmitter {
 
         if (!bot.simulation_mode) {
             try {
-                const result = await indodax.trade(bot.pair, 'sell', currentPrice, bot.position_amount, 'limit');
+                // Market order: pass coin amount for sell, gets filled instantly
+                const result = await indodax.trade(bot.pair, 'sell', currentPrice, bot.position_amount, 'market');
                 orderId = result.order_id?.toString();
-                this.log('sell', `✅ [${pairLabel}] Order SELL berhasil! ID: ${orderId}`, bot.pair);
+                this.log('sell', `✅ [${pairLabel}] Market SELL berhasil! ID: ${orderId}`, bot.pair);
             } catch (err) {
                 this.log('error', `❌ [${pairLabel}] Gagal menjual: ${err.message}`, bot.pair);
                 status = 'failed';
