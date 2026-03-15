@@ -107,6 +107,38 @@ router.post('/bot/stop', (req, res) => {
     }
 });
 
+// === Bot Reset ===
+router.post('/bot/reset', (req, res) => {
+    try {
+        const bots = db.getBots();
+        let resetCount = 0;
+        for (const bot of bots) {
+            if (bot.position_amount > 0 || bot.buy_price > 0) {
+                db.updateBot(bot.id, {
+                    buy_price: 0, position_amount: 0, position_coin: '',
+                    price_high: 0, price_low: 0
+                });
+                resetCount++;
+            }
+        }
+        res.json({ success: true, message: `${resetCount} bot direset`, data: { resetCount } });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+router.post('/bots/:id/reset', (req, res) => {
+    try {
+        db.updateBot(req.params.id, {
+            buy_price: 0, position_amount: 0, position_coin: '',
+            price_high: 0, price_low: 0
+        });
+        res.json({ success: true, message: 'Bot direset' });
+    } catch (err) {
+        res.status(400).json({ success: false, error: err.message });
+    }
+});
+
 // === Manual Buy/Sell ===
 router.post('/bots/:id/buy', async (req, res) => {
     try {
