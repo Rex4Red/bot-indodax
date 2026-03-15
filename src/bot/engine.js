@@ -198,12 +198,37 @@ class BotEngine extends EventEmitter {
 
     async executeSell(bot, globalSettings, currentPrice, reason) {
         const coin = bot.pair.split('_')[0];
-        const pl = strategy.calculateProfitLoss(currentPrice, bot.buy_price, bot.position_amount);
         const pairLabel = bot.pair.replace('_', '/').toUpperCase();
         const reasonLabel = reason === 'take_profit' ? 'TAKE PROFIT 📈' : reason === 'stop_loss' ? 'STOP LOSS 📉' : 'MANUAL SELL 🖐️';
 
+        let sellAmount = bot.position_amount;
+
+        // In LIVE mode, check actual balance to avoid "Insufficient balance" error
+        if (!bot.simulation_mode) {
+            try {
+                const info = await indodax.getInfo();
+                const actualBalance = parseFloat(info.balance?.[coin] || 0);
+                if (actualBalance <= 0) {
+                    this.log('error', `❌ [${pairLabel}] Tidak ada saldo ${coin.toUpperCase()} di Indodax`, bot.pair);
+                    // Reset stuck position
+                    db.updateBot(bot.id, { buy_price: 0, position_amount: 0, position_coin: '', price_high: 0, price_low: 0 });
+                    throw new Error(`Tidak ada saldo ${coin.toUpperCase()} untuk dijual`);
+                }
+                // Use actual balance (may differ from recorded due to fees)
+                if (actualBalance < sellAmount) {
+                    this.log('info', `⚠️ [${pairLabel}] Saldo aktual ${actualBalance.toFixed(8)} < recorded ${sellAmount.toFixed(8)} (fee)`, bot.pair);
+                    sellAmount = actualBalance;
+                }
+            } catch (err) {
+                if (err.message.includes('Tidak ada saldo')) throw err;
+                this.log('error', `⚠️ [${pairLabel}] Gagal cek saldo: ${err.message}`, bot.pair);
+            }
+        }
+
+        const pl = strategy.calculateProfitLoss(currentPrice, bot.buy_price, sellAmount);
+
         this.log('sell', `🔴 [${pairLabel}] ${reasonLabel}`, bot.pair);
-        this.log('sell', `💵 [${pairLabel}] Menjual ${bot.position_amount.toFixed(8)} ${coin.toUpperCase()} @ ${strategy.formatIDR(currentPrice)}`, bot.pair);
+        this.log('sell', `💵 [${pairLabel}] Menjual ${sellAmount.toFixed(8)} ${coin.toUpperCase()} @ ${strategy.formatIDR(currentPrice)}`, bot.pair);
         this.log('sell', `${pl.absolute >= 0 ? '💰' : '💸'} [${pairLabel}] P/L: ${strategy.formatIDR(pl.absolute)} (${pl.percentage.toFixed(2)}%)`, bot.pair);
 
         let orderId = null;
@@ -211,8 +236,8 @@ class BotEngine extends EventEmitter {
 
         if (!bot.simulation_mode) {
             try {
-                // Market order: pass coin amount for sell, gets filled instantly
-                const result = await indodax.trade(bot.pair, 'sell', currentPrice, bot.position_amount, 'market');
+                // Market order with actual balance amount
+                const result = await indodax.trade(bot.pair, 'sell', currentPrice, sellAmount, 'market');
                 orderId = result.order_id?.toString();
                 this.log('sell', `✅ [${pairLabel}] Market SELL berhasil! ID: ${orderId}`, bot.pair);
             } catch (err) {
@@ -239,8 +264,8 @@ class BotEngine extends EventEmitter {
             pair: bot.pair,
             type: 'sell',
             price: currentPrice,
-            amount: bot.position_amount,
-            total: currentPrice * bot.position_amount,
+            amount: sellAmount,
+            total: currentPrice * sellAmount,
             profit_loss: status !== 'failed' ? pl.absolute : 0,
             profit_loss_pct: status !== 'failed' ? pl.percentage : 0,
             status,
@@ -254,7 +279,7 @@ class BotEngine extends EventEmitter {
             throw new Error('Trade gagal dieksekusi di Indodax');
         }
 
-        this.emit('trade', { type: 'sell', pair: bot.pair, price: currentPrice, amount: bot.position_amount, pnl: pl });
+        this.emit('trade', { type: 'sell', pair: bot.pair, price: currentPrice, amount: sellAmount, pnl: pl });
     }
 
     async manualBuy(botId) {
