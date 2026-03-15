@@ -127,8 +127,29 @@ class BotEngine extends EventEmitter {
                 await this.executeSell(bot, globalSettings, currentPrice, 'stop_loss');
             }
         } else {
+            // Cooldown check: don't buy within 60s after last sell
+            if (bot.last_sell_time) {
+                const elapsed = Date.now() - bot.last_sell_time;
+                if (elapsed < 60000) {
+                    this.log('info', `⏳ ${pairLabel}: Cooldown ${Math.ceil((60000 - elapsed) / 1000)}s setelah sell`, bot.pair);
+                    return;
+                }
+            }
+
+            // Set fresh reference if needed (after sell reset)
+            if (!bot.reference_price || bot.reference_price === 0) {
+                db.updateBot(bot.id, { reference_price: currentPrice });
+                this.log('info', `📌 ${pairLabel}: Referensi baru ${strategy.formatIDR(currentPrice)}`, bot.pair);
+                return;
+            }
+
             const changePct = strategy.calculateChangePercent(currentPrice, bot.reference_price);
             this.log('info', `💰 ${pairLabel}: ${strategy.formatIDR(currentPrice)} (Ref: ${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%)`, bot.pair);
+
+            // Update reference price if price goes HIGHER (trailing reference)
+            if (currentPrice > bot.reference_price) {
+                db.updateBot(bot.id, { reference_price: currentPrice });
+            }
 
             if (strategy.shouldBuy(currentPrice, bot.reference_price, bot.buy_threshold)) {
                 await this.executeBuy(bot, globalSettings, currentPrice);
@@ -266,9 +287,10 @@ class BotEngine extends EventEmitter {
                 buy_price: 0,
                 position_amount: 0,
                 position_coin: '',
-                reference_price: currentPrice,
+                reference_price: 0,  // Reset to 0 so next tick sets fresh reference
                 price_high: 0,
-                price_low: 0
+                price_low: 0,
+                last_sell_time: Date.now()  // Cooldown timer
             });
         }
 
