@@ -187,17 +187,35 @@ class BotEngine extends EventEmitter {
                     return;
                 }
 
+                // Record coin balance BEFORE buy
+                const coinBalanceBefore = parseFloat(info.balance?.[coin] || 0);
+
                 // Market order: pass IDR amount for buy, gets filled instantly
                 const result = await indodax.trade(bot.pair, 'buy', currentPrice, bot.trade_amount, 'market');
                 orderId = result.order_id?.toString();
-                // Get actual filled amount from response
-                if (result.receive_coin) {
-                    actualAmount = parseFloat(result.receive_coin[coin] || actualAmount);
+
+                // Log raw response for debugging
+                this.log('info', `🔍 [${pairLabel}] Trade response: ${JSON.stringify(result).substring(0, 200)}`, bot.pair);
+
+                // Check actual coin balance AFTER buy to get REAL received amount
+                const infoAfter = await indodax.getInfo();
+                const coinBalanceAfter = parseFloat(infoAfter.balance?.[coin] || 0);
+                const idrBalanceAfter = parseFloat(infoAfter.balance?.idr || 0);
+
+                // Calculate actual received coins and effective price
+                const actualReceived = coinBalanceAfter - coinBalanceBefore;
+                const actualSpent = idrBalance - idrBalanceAfter;
+
+                if (actualReceived > 0) {
+                    actualAmount = actualReceived;
+                    actualPrice = Math.round(actualSpent / actualReceived); // Effective price including fees
+                    this.log('buy', `✅ [${pairLabel}] Market BUY berhasil! Dapat ${actualAmount.toFixed(8)} ${coin.toUpperCase()} | Spent ${strategy.formatIDR(actualSpent)} | Effective: ${strategy.formatIDR(actualPrice)}/coin`, bot.pair);
+                } else {
+                    // Fallback: use response data or estimate with fee deduction
+                    actualAmount = coinAmount * 0.997; // Deduct 0.3% fee estimate
+                    actualPrice = Math.round(bot.trade_amount / actualAmount);
+                    this.log('buy', `✅ [${pairLabel}] Market BUY berhasil! ~${actualAmount.toFixed(8)} ${coin.toUpperCase()} (estimated)`, bot.pair);
                 }
-                if (result.spend_rp) {
-                    actualPrice = Math.round(parseFloat(result.spend_rp) / actualAmount);
-                }
-                this.log('buy', `✅ [${pairLabel}] Market BUY berhasil! Dapat ${actualAmount.toFixed(8)} ${coin.toUpperCase()}`, bot.pair);
             } catch (err) {
                 this.log('error', `❌ [${pairLabel}] Gagal membeli: ${err.message}`, bot.pair);
                 status = 'failed';
