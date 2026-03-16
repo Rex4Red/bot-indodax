@@ -179,6 +179,14 @@ class BotEngine extends EventEmitter {
 
         if (!bot.simulation_mode) {
             try {
+                // Check IDR balance first to avoid unnecessary API errors
+                const info = await indodax.getInfo();
+                const idrBalance = parseFloat(info.balance?.idr || 0);
+                if (idrBalance < bot.trade_amount) {
+                    this.log('info', `⚠️ [${pairLabel}] Saldo IDR tidak cukup: ${strategy.formatIDR(idrBalance)} < ${strategy.formatIDR(bot.trade_amount)}`, bot.pair);
+                    return;
+                }
+
                 // Market order: pass IDR amount for buy, gets filled instantly
                 const result = await indodax.trade(bot.pair, 'buy', currentPrice, bot.trade_amount, 'market');
                 orderId = result.order_id?.toString();
