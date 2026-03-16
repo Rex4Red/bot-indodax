@@ -88,7 +88,7 @@ async function loadDashboard() {
         try {
             const ver = await api('/version');
             document.getElementById('botVersion').textContent = 'v' + (ver.version || '?');
-        } catch(e) {}
+        } catch(e) { console.error('Version fetch error:', e); }
 
         activeBots = status.bots || [];
         updateBotStatus(status.isRunning);

@@ -8,7 +8,7 @@ const BOT_VERSION = require('../../package.json').version;
 
 // === Version ===
 router.get('/version', (req, res) => {
-    res.json({ success: true, version: BOT_VERSION });
+    res.json({ success: true, data: { version: BOT_VERSION } });
 });
 
 // === Discord Sync ===

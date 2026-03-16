@@ -181,23 +181,21 @@ function request(url, method, body) {
             let data = '';
             res.on('data', chunk => data += chunk);
             res.on('end', () => {
-                try {
-                    if (res.statusCode >= 200 && res.statusCode < 300) {
+                if (res.statusCode >= 200 && res.statusCode < 300) {
+                    try {
                         const parsed = JSON.parse(data);
                         resolve(parsed.id || null);
-                    } else {
-                        console.error(`Discord API error ${res.statusCode}: ${data}`);
-                        resolve(null);
+                    } catch {
+                        reject(new Error(`Discord parse error: ${data.substring(0, 100)}`));
                     }
-                } catch {
-                    resolve(null);
+                } else {
+                    reject(new Error(`Discord HTTP ${res.statusCode}: ${data.substring(0, 150)}`));
                 }
             });
         });
 
         req.on('error', (err) => {
-            console.error('Discord webhook error:', err.message);
-            resolve(null);
+            reject(new Error(`Discord network error: ${err.message}`));
         });
         req.write(body);
         req.end();
