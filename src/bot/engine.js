@@ -65,6 +65,9 @@ class BotEngine extends EventEmitter {
             this.log('info', `📊 ${bot.pair.replace('_', '/').toUpperCase()} → Buy Dip ${bot.buy_threshold}%, TP ${bot.sell_profit}%, SL ${bot.sell_loss}%, Amount ${strategy.formatIDR(bot.trade_amount)}`, bot.pair);
         }
 
+        // Send Discord embeds for bots that don't have one yet
+        this.syncDiscordEmbeds();
+
         // Start monitoring loop
         const intervalMs = (globalSettings.check_interval || 10) * 1000;
         this.interval = setInterval(() => this.tick(), intervalMs);
@@ -448,6 +451,35 @@ class BotEngine extends EventEmitter {
             }
         } catch (err) {
             this.log('error', `Discord notification error: ${err.message}`);
+        }
+    }
+
+    async syncDiscordEmbeds() {
+        const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
+        if (!webhookUrl) return;
+
+        const bots = db.getBots();
+        for (const bot of bots) {
+            if (!bot.discord_message_id) {
+                try {
+                    const stats = discord.getCoinStats(db.getTrades(), bot.pair);
+                    const extra = { action: 'added', totalPL: stats.totalPL, wins: stats.wins, losses: stats.losses };
+                    if (bot.buy_price > 0) {
+                        extra.buyPrice = bot.buy_price;
+                        extra.buyTime = bot.last_buy_time || new Date();
+                    }
+                    const embed = discord.buildCoinEmbed(bot, extra);
+                    const msgId = await discord.sendEmbed(webhookUrl, embed);
+                    if (msgId) {
+                        db.updateBot(bot.id, { discord_message_id: msgId });
+                        this.log('info', `📨 Discord embed dibuat untuk ${bot.pair.replace('_', '/').toUpperCase()}`);
+                    }
+                    // Avoid rate limiting
+                    await new Promise(r => setTimeout(r, 1000));
+                } catch (err) {
+                    this.log('error', `Discord sync error ${bot.pair}: ${err.message}`);
+                }
+            }
         }
     }
 }

@@ -11,6 +11,16 @@ router.get('/version', (req, res) => {
     res.json({ success: true, version: BOT_VERSION });
 });
 
+// === Discord Sync ===
+router.post('/discord/sync', async (req, res) => {
+    try {
+        await botEngine.syncDiscordEmbeds();
+        res.json({ success: true, message: 'Discord embeds synced' });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 // === Bot Status ===
 router.get('/status', (req, res) => {
     try {
