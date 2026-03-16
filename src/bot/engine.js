@@ -456,9 +456,14 @@ class BotEngine extends EventEmitter {
 
     async syncDiscordEmbeds() {
         const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
-        if (!webhookUrl) return;
+        if (!webhookUrl) {
+            this.log('info', '⚠️ DISCORD_WEBHOOK_URL tidak diset di .env');
+            return;
+        }
+        this.log('info', `🔔 Discord webhook aktif: ...${webhookUrl.slice(-20)}`);
 
         const bots = db.getBots();
+        let synced = 0;
         for (const bot of bots) {
             if (!bot.discord_message_id) {
                 try {
@@ -469,18 +474,22 @@ class BotEngine extends EventEmitter {
                         extra.buyTime = bot.last_buy_time || new Date();
                     }
                     const embed = discord.buildCoinEmbed(bot, extra);
+                    this.log('info', `📨 Mengirim Discord embed untuk ${bot.pair.replace('_', '/').toUpperCase()}...`);
                     const msgId = await discord.sendEmbed(webhookUrl, embed);
                     if (msgId) {
                         db.updateBot(bot.id, { discord_message_id: msgId });
-                        this.log('info', `📨 Discord embed dibuat untuk ${bot.pair.replace('_', '/').toUpperCase()}`);
+                        this.log('info', `✅ Discord embed berhasil: ${bot.pair.replace('_', '/').toUpperCase()} (ID: ${msgId})`);
+                        synced++;
+                    } else {
+                        this.log('error', `❌ Discord embed gagal (null response) untuk ${bot.pair.replace('_', '/').toUpperCase()}`);
                     }
-                    // Avoid rate limiting
                     await new Promise(r => setTimeout(r, 1000));
                 } catch (err) {
-                    this.log('error', `Discord sync error ${bot.pair}: ${err.message}`);
+                    this.log('error', `❌ Discord sync error ${bot.pair}: ${err.message}`);
                 }
             }
         }
+        if (synced > 0) this.log('info', `📨 ${synced} Discord embed berhasil dibuat`);
     }
 }
 

@@ -16,7 +16,6 @@
         <a href="#" class="navbar-brand" onclick="navigateTo('dashboard')">
             <span class="logo-icon">🤖</span>
             <span class="brand-text">INDODAX BOT</span>
-            <span id="botVersion" style="font-size:0.65em;color:#00ffcc;margin-left:8px;background:rgba(0,255,204,0.1);padding:2px 8px;border-radius:8px;font-weight:600">v...</span>
         </a>
         <div class="navbar-status stopped" id="botStatusBadge">
             <span class="dot"></span>
@@ -30,7 +29,8 @@
         <a class="nav-link" data-page="history" onclick="navigateTo('history')">History</a>
     </div>
 
-    <div class="navbar-right">
+    <div class="navbar-right" style="display:flex;align-items:center;gap:10px">
+        <span id="botVersion" style="font-size:0.7em;color:#00ffcc;background:rgba(0,255,204,0.15);padding:3px 10px;border-radius:10px;font-weight:600">v...</span>
         <div class="connection-badge" id="connectionBadge">
             <span class="dot"></span>
             <span>Connected</span>
