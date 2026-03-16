@@ -3,6 +3,13 @@ const router = express.Router();
 const indodax = require('../api/indodax');
 const db = require('../database/db');
 const botEngine = require('../bot/engine');
+const discord = require('../notifications/discord');
+const BOT_VERSION = require('../../package.json').version;
+
+// === Version ===
+router.get('/version', (req, res) => {
+    res.json({ success: true, version: BOT_VERSION });
+});
 
 // === Bot Status ===
 router.get('/status', (req, res) => {
@@ -61,9 +68,22 @@ router.get('/bots', (req, res) => {
     }
 });
 
-router.post('/bots', (req, res) => {
+router.post('/bots', async (req, res) => {
     try {
         const bot = db.addBot(req.body);
+
+        // Send Discord notification for new coin
+        const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
+        if (webhookUrl) {
+            try {
+                const embed = discord.buildCoinEmbed(bot, { action: 'added' });
+                const msgId = await discord.sendEmbed(webhookUrl, embed);
+                if (msgId) {
+                    db.updateBot(bot.id, { discord_message_id: msgId });
+                }
+            } catch (e) { /* ignore discord errors */ }
+        }
+
         res.json({ success: true, data: bot });
     } catch (err) {
         res.status(400).json({ success: false, error: err.message });

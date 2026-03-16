@@ -189,6 +189,10 @@ function getTradeLogs(limit = 50, offset = 0, pair = null) {
     return trades.slice(offset, offset + limit);
 }
 
+function getTrades() {
+    return [...data.trades];
+}
+
 function getTradeStats(pair = null) {
     let trades = data.trades;
     if (pair) trades = trades.filter(t => t.pair === pair);
@@ -240,6 +244,7 @@ module.exports = {
     removeBot,
     addTradeLog,
     getTradeLogs,
+    getTrades,
     getTradeStats,
     getFavorites,
     addFavorite,

@@ -84,6 +84,12 @@ async function loadDashboard() {
             api('/settings')
         ]);
 
+        // Fetch and display version
+        try {
+            const ver = await api('/version');
+            document.getElementById('botVersion').textContent = 'v' + (ver.version || '?');
+        } catch(e) {}
+
         activeBots = status.bots || [];
         updateBotStatus(status.isRunning);
         document.getElementById('toggleBot').checked = status.isRunning;

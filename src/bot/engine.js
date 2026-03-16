@@ -2,6 +2,7 @@ const EventEmitter = require('events');
 const indodax = require('../api/indodax');
 const strategy = require('./strategy');
 const db = require('../database/db');
+const discord = require('../notifications/discord');
 
 class BotEngine extends EventEmitter {
     constructor() {
@@ -231,7 +232,8 @@ class BotEngine extends EventEmitter {
                 position_amount: actualAmount,
                 position_coin: coin,
                 price_high: actualPrice,
-                price_low: actualPrice
+                price_low: actualPrice,
+                last_buy_time: new Date().toISOString()
             });
         }
 
@@ -251,6 +253,12 @@ class BotEngine extends EventEmitter {
         if (status === 'failed') {
             throw new Error('Trade gagal dieksekusi di Indodax');
         }
+
+        // Discord notification
+        this.sendDiscordNotification(bot.id, 'buy', {
+            buyPrice: actualPrice,
+            buyTime: new Date()
+        });
 
         this.emit('trade', { type: 'buy', pair: bot.pair, price: currentPrice, amount: coinAmount });
     }
@@ -339,6 +347,21 @@ class BotEngine extends EventEmitter {
             throw new Error('Trade gagal dieksekusi di Indodax');
         }
 
+        // Discord notification
+        const stats = discord.getCoinStats(db.getTrades(), bot.pair);
+        this.sendDiscordNotification(bot.id, 'sell', {
+            sellPrice: currentPrice,
+            sellTime: new Date(),
+            buyPrice: bot.buy_price,
+            buyTime: bot.last_buy_time || null,
+            profitLoss: pl.absolute,
+            profitPct: pl.percentage,
+            totalPL: stats.totalPL,
+            wins: stats.wins,
+            losses: stats.losses,
+            logMessage: `${reason === 'take_profit' ? 'TP' : reason === 'stop_loss' ? 'SL' : 'Manual'}: ${pl.percentage.toFixed(2)}% | ${strategy.formatIDR(pl.absolute)}`
+        });
+
         this.emit('trade', { type: 'sell', pair: bot.pair, price: currentPrice, amount: sellAmount, pnl: pl });
     }
 
@@ -400,6 +423,32 @@ class BotEngine extends EventEmitter {
         let logs = this.logs;
         if (pair) logs = logs.filter(l => l.pair === pair || l.pair === '');
         return logs.slice(0, limit);
+    }
+
+    async sendDiscordNotification(botId, action, extra = {}) {
+        const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
+        if (!webhookUrl) return;
+
+        try {
+            const bot = db.getBot(botId);
+            if (!bot) return;
+
+            extra.action = action;
+            const embed = discord.buildCoinEmbed(bot, extra);
+
+            if (bot.discord_message_id) {
+                // Edit existing message
+                await discord.editEmbed(webhookUrl, bot.discord_message_id, embed);
+            } else {
+                // Send new message and store ID
+                const msgId = await discord.sendEmbed(webhookUrl, embed);
+                if (msgId) {
+                    db.updateBot(botId, { discord_message_id: msgId });
+                }
+            }
+        } catch (err) {
+            this.log('error', `Discord notification error: ${err.message}`);
+        }
     }
 }
 
