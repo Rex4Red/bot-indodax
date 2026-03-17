@@ -299,7 +299,7 @@ class BotEngine extends EventEmitter {
 
         this.log('sell', `🔴 [${pairLabel}] ${reasonLabel}`, bot.pair);
         this.log('sell', `💵 [${pairLabel}] Menjual ${sellAmount.toFixed(8)} ${coin.toUpperCase()} @ ${strategy.formatIDR(currentPrice)}`, bot.pair);
-        this.log('sell', `${pl.absolute >= 0 ? '💰' : '💸'} [${pairLabel}] P/L: ${strategy.formatIDR(pl.absolute)} (${pl.percentage.toFixed(2)}%)`, bot.pair);
+        this.log('sell', `${pl.absolute >= 0 ? '💰' : '💸'} [${pairLabel}] P/L Bersih: ${strategy.formatIDR(pl.absolute)} (${pl.percentage.toFixed(2)}%) | Fee: ${strategy.formatIDR(pl.totalFee)}`, bot.pair);
 
         let orderId = null;
         let status = 'executed';

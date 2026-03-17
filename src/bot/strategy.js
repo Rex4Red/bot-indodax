@@ -29,11 +29,21 @@ function shouldSellLoss(currentPrice, buyPrice, sellLossThreshold) {
 }
 
 function calculateProfitLoss(sellPrice, buyPrice, amount) {
+    const FEE_RATE = 0.003; // 0.3% Indodax fee per trade
     const sellTotal = sellPrice * amount;
     const buyTotal = buyPrice * amount;
+    // Deduct buy fee (paid when buying) and sell fee (paid when selling)
+    const buyFee = buyTotal * FEE_RATE;
+    const sellFee = sellTotal * FEE_RATE;
+    const netProfit = sellTotal - buyTotal - buyFee - sellFee;
+    const netPct = buyTotal > 0 ? (netProfit / buyTotal) * 100 : 0;
     return {
-        absolute: sellTotal - buyTotal,
-        percentage: calculateChangePercent(sellPrice, buyPrice)
+        absolute: Math.round(netProfit),
+        percentage: netPct,
+        grossProfit: sellTotal - buyTotal,
+        buyFee: Math.round(buyFee),
+        sellFee: Math.round(sellFee),
+        totalFee: Math.round(buyFee + sellFee)
     };
 }
 
