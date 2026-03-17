@@ -29,7 +29,7 @@ function shouldSellLoss(currentPrice, buyPrice, sellLossThreshold) {
 }
 
 function calculateProfitLoss(sellPrice, buyPrice, amount) {
-    const FEE_RATE = 0.003; // 0.3% Indodax fee per trade
+    const FEE_RATE = 0.0044; // 0.44% Indodax all-in fee (trading 0.3% + tax 0.12% + CFX 0.02%)
     const sellTotal = sellPrice * amount;
     const buyTotal = buyPrice * amount;
     // Deduct buy fee (paid when buying) and sell fee (paid when selling)
